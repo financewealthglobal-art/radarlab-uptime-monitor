@@ -6,8 +6,8 @@ const now = new Date("2026-11-02T12:00:00Z");
 
 test("initial healthy check records state without posting", async () => {
   const saved = []; let calls = 0;
-  const result = await checkMonitor({ webhook, now, previous: null, save: async s => saved.push(s), fetchImpl: async () => { calls++; return Response.json({ ready: true }); } });
-  assert.equal(calls, 1); assert.equal(result.delivery, "not_needed"); assert.equal(saved.length, 1);
+  const result = await checkMonitor({ webhook, now, previous: null, save: async s => saved.push(s), fetchImpl: async () => { calls++; return Response.json({ ready: true, healthy: true }); } });
+  assert.equal(calls, 2); assert.equal(result.delivery, "not_needed"); assert.equal(saved.length, 1);
 });
 test("down transition persists intent before one restricted post", async () => {
   const saved = []; let posts = 0;
@@ -29,8 +29,21 @@ test("ambiguous sends are recorded and never repeated on unchanged health", asyn
   assert.equal(posts, 1); assert.equal(saved.length, 2);
 });
 test("recovery posts once even if the preceding down alert was uncertain", async () => {
-  const result = await checkMonitor({ webhook, now, previous: { health: "unavailable", delivery: "intent" }, save: async () => {}, fetchImpl: async (_url, init) => Response.json(init.method ? { id: "000000000000000003" } : { ready: true }) });
+  const result = await checkMonitor({ webhook, now, previous: { health: "unavailable", delivery: "intent" }, save: async () => {}, fetchImpl: async (_url, init) => Response.json(init.method ? { id: "000000000000000003" } : { ready: true, healthy: true }) });
   assert.equal(result.health, "healthy"); assert.equal(result.delivery, "confirmed");
+});
+test("live web app with stale worker posts once and recovers independently", async () => {
+  let posts=0;
+  const down=await checkMonitor({webhook,now,previous:{health:'healthy'},save:async()=>{},fetchImpl:async(url,init)=>{
+    if(init.method){posts++;assert.match(JSON.parse(init.body).content,/background worker/);return Response.json({id:'000000000000000005'});}
+    return Response.json(url.endsWith('/api/ready')?{ready:true}:{healthy:false},{status:url.endsWith('/api/ready')?200:503});
+  }});
+  assert.equal(down.health,'worker_unavailable');assert.equal(posts,1);
+  await checkMonitor({webhook,now,previous:down,save:async()=>assert.fail('unchanged'),fetchImpl:async(url,init)=>{
+    assert.equal(init.method,undefined);return Response.json(url.endsWith('/api/ready')?{ready:true}:{healthy:false});
+  }});
+  const up=await checkMonitor({webhook,now,previous:down,save:async()=>{},fetchImpl:async(_url,init)=>Response.json(init.method?{id:'000000000000000006'}:{ready:true,healthy:true})});
+  assert.equal(up.health,'healthy');assert.equal(up.delivery,'confirmed');
 });
 test("failure to persist intent prevents any Discord send", async () => {
   let posts = 0;

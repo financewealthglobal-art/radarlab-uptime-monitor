@@ -14,28 +14,35 @@ export async function checkMonitor({ previous, save, fetchImpl, webhook, now = n
       target.username || target.password || target.search || target.hash)
     throw new Error("A dedicated Discord webhook must be configured privately.");
   let healthy = false;
+  let workerHealthy = false;
   try {
     const response = await fetchImpl(readinessUrl, {
       redirect: "error", signal: AbortSignal.timeout(10_000),
     });
     healthy = response.ok && (await response.json()).ready === true;
+    if (healthy) {
+      const worker = await fetchImpl(appUrl + "/api/worker-health", { redirect: "error", signal: AbortSignal.timeout(10_000) });
+      workerHealthy = worker.ok && (await worker.json()).healthy === true;
+    }
   } catch { /* A timeout, malformed response or refusal is an unavailable check. */ }
 
-  const health = healthy ? "healthy" : "unavailable";
+  const health = !healthy ? "unavailable" : workerHealthy ? "healthy" : "worker_unavailable";
   if (previous?.health === health)
     return { health, delivery: previous.delivery, changed: false };
   const state = {
     health, checkedAt: now.toISOString(),
     transitionKey: `${health}:${now.toISOString()}`,
-    delivery: !previous && healthy ? "not_needed" : "intent",
+    delivery: !previous && health === "healthy" ? "not_needed" : "intent",
   };
   // Push the intent before contacting Discord. A later run never repeats an
   // uncertain send, including a runner crash after Discord accepted the message.
   await save(state);
   if (state.delivery === "not_needed") return { ...state, changed: true };
 
-  const content = healthy
-    ? `Radarlab is back. Its public readiness checks pass. ${appUrl}`
+  const content = health === "healthy"
+    ? `Radarlab and its background worker are back. Public readiness and worker progress checks pass. ${appUrl}`
+    : health === "worker_unavailable"
+    ? `Radarlab background worker has no recent heartbeat or pipeline progress within 30 minutes. Reminders and automation may be paused even though HQ pages work. Check the Railway worker logs and restart the worker after reviewing unfinished deliveries. ${appUrl}`
     : `Radarlab was unavailable in the latest external check. HQ pages and automation may be affected. Check the Railway web/worker deployment and database. ${appUrl}`;
   target.searchParams.set("wait", "true");
   let receipt = null;
@@ -69,7 +76,9 @@ async function main() {
   };
   const result = await checkMonitor({ previous, save, fetchImpl: fetch, webhook: process.env.DISCORD_WEBHOOK_URL });
   console.log(JSON.stringify(result));
-  if (result.delivery === "unknown" || result.delivery === "intent") process.exitCode = 1;
+  // A failed transition run triggers GitHub's independent failure email;
+  // unchanged state never sends a duplicate alert or repeated failure email.
+  if (result.changed && (result.delivery === "unknown" || result.delivery === "intent")) process.exitCode = 1;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
   main().catch(() => { console.error("Monitor paused. Review its last recorded intent before any manual retry. No secret or provider error is displayed."); process.exitCode = 1; });

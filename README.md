@@ -4,7 +4,9 @@ Independent public-endpoint monitoring for Radarlab. It keeps working if Railway
 
 Runs on a standard GitHub-hosted Linux runner at minutes 7, 22, 37 and 52 of every hour. GitHub scheduled workflows are best-effort and can be delayed; this is not a fifteen-minute SLA. Standard hosted-runner use in public repositories is free: https://docs.github.com/en/actions/concepts/billing-and-usage.
 
-Only checks the public `/api/ready` URL. It never signs into Radarlab, reads credentials or calls a paid provider. It posts outage/recovery transitions through a dedicated Discord webhook restricted to `automation-alerts`. No initial healthy notice and no unchanged-state spam.
+Checks public `/api/ready` and `/api/worker-health`. The second signal detects a process heartbeat or successful pipeline cycle older than thirty minutes, independently of the worker itself. With fifteen-minute checks, detection happens on the next run after that threshold; scheduling delays are possible. It never signs into Radarlab, reads credentials or calls a paid provider. It posts outage/recovery transitions through a dedicated Discord webhook restricted to `automation-alerts`. No initial healthy notice and no unchanged-state spam.
+
+If Discord delivery fails or is ambiguous, the transition's workflow run fails, allowing GitHub's failure email notification to reach the workflow owner. The owner account has failed-workflow emails enabled to its registered Gmail inbox (verified during setup). No Gmail inbox access or SMTP credential is required. A later unchanged result neither repeats the Discord send nor fails again just to repeat an email. An interrupted runner can also trigger GitHub's failure notification. GitHub and email delivery remain external dependencies; inbox receipt was not tested by manufacturing an outage.
 
 Required encrypted Actions secret: `DISCORD_WEBHOOK_URL`. Never put its value in a file or commit. The webhook can post only to its configured Discord channel; it cannot read HQ messages or manage roles/members.
 
