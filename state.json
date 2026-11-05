@@ -1,6 +1,6 @@
 {
-  "health": "healthy",
-  "checkedAt": "2026-11-02T15:21:41.723Z",
-  "transitionKey": "healthy:2026-11-02T15:21:41.723Z",
-  "delivery": "not_needed"
+  "health": "worker_unavailable",
+  "checkedAt": "2026-11-05T21:27:29.273Z",
+  "transitionKey": "worker_unavailable:2026-11-05T21:27:29.273Z",
+  "delivery": "intent"
 }
