@@ -2,5 +2,6 @@
   "health": "healthy",
   "checkedAt": "2026-11-06T01:46:19.210Z",
   "transitionKey": "healthy:2026-11-06T01:46:19.210Z",
-  "delivery": "intent"
+  "delivery": "confirmed",
+  "receiptHash": "9db47b7434b05d732137acd6e8dfc4b7c7e9eb23382757368e0a44a3b76e6c31"
 }
