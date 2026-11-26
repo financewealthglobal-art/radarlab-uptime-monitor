@@ -1,7 +1,6 @@
 {
-  "health": "worker_unavailable",
-  "checkedAt": "2026-11-26T05:10:25.857Z",
-  "transitionKey": "worker_unavailable:2026-11-26T05:10:25.857Z",
-  "delivery": "confirmed",
-  "receiptHash": "241f7836ff7e5a82f3bc9344179b3d4f7dbd6e270f45ad36834a25787a2ef333"
+  "health": "healthy",
+  "checkedAt": "2026-11-26T15:27:00.555Z",
+  "transitionKey": "healthy:2026-11-26T15:27:00.555Z",
+  "delivery": "intent"
 }
